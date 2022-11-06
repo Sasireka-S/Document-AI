@@ -152,11 +152,11 @@ def keyword_extraction(text):
     text = ' '.join([w.lower() for w in text])
     re.sub("\s+", " ", text)
     re.sub(r'[^\w ]+', "", text)
-    stop_words = nltk.corpus.stopwords.words('english')
+    nltk.download('stopwords')
     words = nltk.word_tokenize(text)
     punctuations = re.sub(r'\W', ' ', str(text))
     num_less = re.sub('\w*\d\w*', '', text).strip()
-    keywords = [word for word in words if not word in stop_words and word in punctuations and word in num_less]
+    keywords = [word for word in words if not word in stopwords and word in punctuations and word in num_less]
     return keywords
 def make_df(doc_text):
     keywords = keyword_extraction(doc_text)
@@ -215,7 +215,7 @@ def summarize(doc_text):
     l = [WordNetLemmatizer().lemmatize(word) for word in word_tokenize(formatted)]
     l = " ".join(l)
     sentence_list = doc_text
-    stopwords = nltk.corpus.stopwords.words('english')
+    nltk.download('stopwords')
     word_frequencies = {}
     for word in nltk.word_tokenize(l):
         if word not in stopwords:
