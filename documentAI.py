@@ -150,9 +150,9 @@ def keyword_extraction(text):
     :return keywords: List of cleaned words
     """
     text = ' '.join([w.lower() for w in text])
-    stop_words = stopwords.words('english')
     re.sub("\s+", " ", text)
     re.sub(r'[^\w ]+', "", text)
+    stop_words = nltk.corpus.stopwords.words('english')
     words = nltk.word_tokenize(text)
     punctuations = re.sub(r'\W', ' ', str(text))
     num_less = re.sub('\w*\d\w*', '', text).strip()
