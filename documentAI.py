@@ -1,42 +1,30 @@
 import os
-import streamlit as st
+import re
 import numpy as np
-from docx2pdf import convert
-import fitz
 import cv2
-from PIL import Image
-import gensim
-from gensim.parsing import remove_stopwords
-from pytesseract import pytesseract
-import warnings
-import pandas as pd
+import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk.stem import WordNetLemmatizer
 from nltk.cluster.util import cosine_distance
 from textblob import TextBlob
 import heapq
+import gensim
 import gensim.corpora as corpora
 from gensim.models import CoherenceModel
-import re
-import spacy
-import PyPDF2
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
-
-def docs_to_pdf(doc_file):
-    """
-    Convert .docx file to .pdf file if the input file is docx file
-    :param doc_file: URL of the docx file
-    :return
-    URL of the pdf file
-    """
-    if doc_file.split(".")[1] == 'docx':
-        convert(doc_file)
-    return doc_file.split(".")[0]+".pdf"
+import PyPDF2
+import pyttsx3 as pyttsx3
+import fitz
+from PIL import Image
+from gensim.parsing import remove_stopwords
+import warnings
+import pandas as pd
+import streamlit as st
 def img_to_pdf(doc_file):
     """
         Convert image file to .pdf file if the input file is docx file
-        :param doc_file: URL of the image file
+        :parameter doc_file: URL of the image file
         :return pdf_loc: URL of the pdf file
     """
     pdf_loc = doc_file.split(".")[0] + ".pdf"
@@ -49,7 +37,7 @@ def img_to_pdf(doc_file):
 def get_metadata(doc_file):
     """
         Extract metadata of the document
-        :param
+        :parameter
         doc_file: URL of the docx file
         :return
         metas: list of all the metadata of the document
@@ -64,7 +52,7 @@ def get_metadata(doc_file):
 def get_images(doc_file):
     """
         Extract images from the document and save it in the local system
-        :param
+        :parameter
         doc_file: URL of the docx file
         :return
         img_lst: list of URL of the saved images
@@ -85,7 +73,6 @@ def get_images(doc_file):
                         mode = "RGB"
                     else:
                         mode = "P"
-
                     if xObject[obj]['/Filter'] == '/FlateDecode':
                         img = Image.frombytes(mode, size, data)
                         img.save(obj[1:] + ".png")
@@ -112,47 +99,32 @@ def show_images(img_lst):
         cv2.destroyAllWindows()
 def extract_text(doc_file):
     """
-    Convert each page in pdf file into image and extract text from it
-    :param doc_file: URL of the document
-    :return: texts: List of all the sentences of the document
+    Extract text from the document, process it and return list of sentences in the document
+    :parameter
+    doc_file: URL of the document
+    :return
+    all_text: List of all the sentences in the document
     """
-    texts = []
-    dpi = 200
-    dpi_matrix = fitz.Matrix(dpi / 72, dpi / 72)
-    file_path = doc_file
-    with fitz.open(file_path) as pdf_file:
-        for page in pdf_file:
-            page_pixel = page.get_pixmap(matrix=dpi_matrix)
-            page_pixel.set_dpi(dpi, dpi)
-            page_pixel.save(f"{page.number}.png")
-            # Define path to tessaract.exe
-            path_to_tesseract = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-            # Define path to image
-            path_to_image = f"{page.number}.png"
-            # Point tessaract_cmd to tessaract.exe
-            pytesseract.tesseract_cmd = path_to_tesseract
-            # Open image with PIL
-            img = Image.open(path_to_image)
-            # Extract text from image
-            text = pytesseract.image_to_string(img)
-            text = text.split("\n\n")
-            for j in text:
-                j = j.replace('\n', ' ')
-                if j == ' '*len(j):
-                    continue
-                else:
-                    lst = j.split(".")
-                    text = []
-                    for x in lst:
-                        text.append((x+"."))
-                    texts.extend(text)
-    return texts
+    doc = fitz.open(doc_file)
+    all_text = chr(12).join([page.get_text() for page in doc])
+    all_text = all_text.split(".")
+    l = len(all_text)
+    x = 0
+    while x < l:
+        all_text[x] = (all_text[x].replace('\n', ''))+'.'
+        if all_text[x].strip(' ') == ".":
+            all_text.remove(all_text[x])
+            l -= 1
+        else:
+            x += 1
+    return all_text
+
 def number(doc_file):
     open_doc = open(doc_file, 'rb')
     hand_book = PyPDF2.PdfFileReader(open_doc)
     return hand_book.numPages
 
-def author(doc_file):
+def get_author(doc_file):
     open_doc = open(doc_file, 'rb')
     hand_book = PyPDF2.PdfFileReader(open_doc)
     try:
@@ -160,17 +132,22 @@ def author(doc_file):
     except:
         return None
 
-def creation_date(doc_file):
+def get_creation_date(doc_file):
     open_doc = open(doc_file, 'rb')
     hand_book = PyPDF2.PdfFileReader(open_doc)
     cdate = (hand_book.getDocumentInfo()['/CreationDate'])
     cdate = cdate[2:6] + "-" + cdate[6:8] + "-" + cdate[8:10]
     return cdate
+def hear(text):
+    engine = pyttsx3.init()
+    engine.say(text)
+    engine.runAndWait()
+    return
 def keyword_extraction(text):
     """
     Extract only necessary words from the document
     :param text: List of sentences in document
-    :return: keywords: List of cleaned words
+    :return keywords: List of cleaned words
     """
     text = ' '.join([w.lower() for w in text])
     stop_words = stopwords.words('english')
@@ -192,7 +169,7 @@ def bow(doc_text):
     """
     Generate Bag of Words from the dataframe
     :param doc_text: List of sentences of the document
-    :return: data: bow dataframe
+    :return data: bow dataframe
     """
     df = make_df(doc_text)
     corpus = df.Script
@@ -206,7 +183,7 @@ def most_frequent(doc_text):
     """
     Gives most frequent words in the document
     :param doc_text: List of sentences of the document
-    :return: tops: frequent words
+    :return tops: frequent words
     """
     data = bow(doc_text)
     data = data.transpose()
@@ -219,8 +196,19 @@ def summarize(doc_text):
     """
     Provides Summary of the document
     :param doc_text: List of sentences of the document
-    :return: summary: Document summary
+    :param n: Number of lines
+    :return summary: Document summary
     """
+    x = len(doc_text)
+    n = 1
+    if x >= 100:
+        n = 10
+    elif x >= 50:
+        n = 7
+    elif x >= 5:
+        n = 4
+    else:
+        n = x
     lower_text = ' '.join([w.lower() for w in doc_text])
     formatted = re.sub('[^a-zA-Z]', ' ', lower_text)
     formatted = re.sub(r'\s+', ' ', formatted)
@@ -247,7 +235,7 @@ def summarize(doc_text):
                         sentence_scores[sent] = word_frequencies[word]
                     else:
                         sentence_scores[sent] += word_frequencies[word]
-    summary_sentences = heapq.nlargest(7, sentence_scores, key=sentence_scores.get)
+    summary_sentences = heapq.nlargest(n, sentence_scores, key=sentence_scores.get)
     summary = '\n\n'.join(summary_sentences)
     return summary
 def lemmatization(doc_text):
@@ -284,6 +272,9 @@ def topic_modelling(doc_text):
         topic.append(temp)
     return topic
 def sentence_similarity(sent1, sent2):
+    """
+    Identifies similarity between two sentences
+    """
     stop_words = stopwords.words('english')
     sent1 = sent1.split()
     sent2 = sent2.split()
@@ -302,6 +293,7 @@ def sentence_similarity(sent1, sent2):
         vec2[every.index(w)] += 1
     return 1 - cosine_distance(vec1, vec2)
 def polarity(words):
+
     text = ' '.join(words)
     val = TextBlob(text).sentiment[0]
     polar_val = 'Positive'
@@ -317,15 +309,12 @@ def subjectivity(words):
     if val < 0.5:
         sub_val = 'Objective'
     return [val, sub_val]
-def entity(doc_text):
-    nlp = spacy.load("en_core_web_sm")
-    entities = []
-    for text in doc_text:
-        doc = nlp(text)
-        for entity in doc.ents:
-            entities.append([entity.text, entity.label_])
-    return entities
 def pos_tag(doc_text):
+    """
+    Performs Parts Of Speech tagging
+    :param doc_text: List of sentences in the document
+    :return: List with POS tagging of tokenized words
+    """
     text = ' '.join([w.lower() for w in doc_text])
     pos = []
     tokens = word_tokenize(text)
@@ -396,49 +385,60 @@ def save_uploadedfile(uploadedfile):
     with open(os.path.join(os.getcwd() , uploadedfile.name), "wb") as f:
         f.write(uploadedfile.getbuffer())
     return uploadedfile.name
-if __name__ == "__main__":
+def st_ui():
+    st.title("Document digitization")
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-    datafile = 'demo.docx'
-    doc_file = docs_to_pdf(datafile)
-    doc_file = ppt_to_pdf(datafile)
+    datafile = st.file_uploader(label='Your document will be processed', type=['png', 'jpg', 'pdf'],
+                                accept_multiple_files=False, label_visibility="visible")
+    if datafile is not None:
+        file_details = {"FileName": datafile.name, "FileType": datafile.type}
+        datafile = save_uploadedfile(datafile)
+    else:
+        datafile = "demo.pdf"
     doc_file = img_to_pdf(datafile)
-    author = str(author(doc_file))
-    print("Author of the Document : " + author)
-    creationDate = creation_date(doc_file)
-    print("Date of Creation " + creationDate)
+    author = str(get_author(doc_file))
+    st.text("Author of the Document : " + author)
+    creationDate = get_creation_date(doc_file)
+    st.text("Date of Creation " + creationDate)
     total_pages = number(doc_file)
-    print("Document metadata :")
+    st.text("Document metadata :")
     meta_data = get_metadata(doc_file)
-    print(meta_data)
+    st.text(meta_data)
+    st.text("Extracting images in the document ...")
     img_lst = get_images(doc_file)
     # show_images(img_lst)
+    for x in img_lst:
+        img = cv2.imread(x, cv2.IMREAD_ANYCOLOR)
+        st.image(img, width=200)
+    st.text("Extracting text in the document ...")
     doc_text = extract_text(doc_file)
+    st.text(doc_text)
     keywords = keyword_extraction(doc_text)
     df = make_df(doc_text)
     bag_of_words = bow(doc_text)
     t = bag_of_words.transpose()
-    print("Bag of Words :")
-    print(t)
+    st.text("Bag of Words :")
+    st.text(t)
     top100 = most_frequent(doc_text)
-    print("Top 100 words in document :")
-    print(top100)
-    print("Polarity :")
-    print(polarity(keywords))
-    print("Subjectivity :")
-    print(subjectivity(keywords))
-    print(sentence_similarity("Hello I am a document reader", "Welcome to document reader show"))
+    st.text("Most frequent words in document :")
+    st.text(top100)
+    st.text("Polarity :")
+    st.text(polarity(keywords))
+    st.text("Subjectivity :")
+    st.text(subjectivity(keywords))
+    st.text(sentence_similarity("Hello I am a document reader", "Welcome to document reader show"))
+    st.text("Summary of the document :")
     summary = summarize(doc_text)
-    print("Summary of the document :")
-    print(summary)
+    st.text(summary)
     topic = topic_modelling(doc_text)
-    print("Topic modelling :")
-    print(topic)
-    print("Document entities :")
-    print(entity(doc_text))
-    print("Lemmas of the document :")
-    print(lemmatization(doc_text))
-    print("POS tagging :")
-    print(pos_tag(doc_text))
-    print("Question answer finding :")
-    question = input("Enter your query to find an answer from the document")
-    print(search_ans(doc_text, question))
+    st.text("Topic modelling :")
+    st.text(topic)
+    st.text("Lemmas of the document :")
+    st.text(lemmatization(doc_text))
+    st.text("POS tagging :")
+    st.text(pos_tag(doc_text))
+    st.text("Question answer finding :")
+    question = st.text_input("Enter your query to find an answer from the document")
+    st.text(search_ans(doc_text, question))
+if __name__ == "__main__":
+    st_ui()
