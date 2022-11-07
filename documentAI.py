@@ -415,7 +415,6 @@ def st_ui():
     i = 0
     for x in doc_text:
         st.text(x)
-        hear(x)
         i += 1
         if i%4 == 0:
             st.text(" ")
