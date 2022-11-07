@@ -414,7 +414,7 @@ def st_ui():
     doc_text = extract_text(doc_file)
     i = 0
     for x in doc_text:
-        st.text_area(x)
+        st.write(x)
         i += 1
         if i%4 == 0:
             st.text(" ")
